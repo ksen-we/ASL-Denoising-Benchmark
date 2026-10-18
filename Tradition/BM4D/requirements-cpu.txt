@@ -1,0 +1,8 @@
+# Optional CPU denoising and shared evaluation; no CuPy required.
+bm4d==4.2.5
+numpy>=1.24,<2
+scipy>=1.13
+PyWavelets>=1.4
+nibabel>=5
+torch>=2.5
+matplotlib>=3.7

@@ -1,0 +1,57 @@
+{
+  "title": "A Practical Benchmark of Image-Restoration Networks for ASL Perfusion-Weighted Image Denoising",
+  "authors": "[Authors and affiliations to be confirmed]",
+  "synopsis": [
+    [
+      "Motivation",
+      "Low signal-to-noise ratio limits ASL perfusion-weighted image quality, while architecture selection remains task-dependent."
+    ],
+    [
+      "Goal(s)",
+      "To provide a practical comparison of established denoising models for ASL PWI."
+    ],
+    [
+      "Approach",
+      "Four networks were adapted to pseudo-3D and volumetric inputs, with direct and residual prediction, and compared with two classical methods using 217 training and 54 validation cases."
+    ],
+    [
+      "Results",
+      "Transformer models achieved the strongest aggregate validation scores. The best recorded SSIM/PSNR were 0.9220/37.43 dB. Residual prediction substantially improved U-Net, whereas gains from volumetric transformer inputs were modest."
+    ]
+  ],
+  "impact": "This benchmark provides a practical starting point for selecting ASL PWI denoisers. Its results favor transformer baselines in this validation setting, while emphasizing output formulation and consistent evaluation rather than a universally optimal model.",
+  "introduction": [
+    "Arterial spin labeling (ASL) provides noninvasive perfusion imaging but has intrinsically low signal-to-noise ratio. Mean control-label difference images support visual assessment of perfusion abnormalities in clinical practice [1]. We therefore focus on denoising perfusion-weighted images (PWI) before CBF quantification. Building on previous ASL denoising studies [2,3], this work benchmarks established image-restoration architectures under a shared PWI pipeline to inform practical model selection. The contribution is a task-specific comparison, rather than a new network architecture."
+  ],
+  "methods": [
+    [
+      "Data and preprocessing",
+      "The dataset comprised 271 cases: 67 controls, 103 stroke, 14 chronic obstructive pulmonary disease, 59 obstructive sleep apnea, and 28 from the OS-labeled cohort (original dataset label). There were 217 training and 54 validation cases. All acquisitions used a GRASE readout. PLD was 1800 ms unless explicitly labeled 1500 or 2000 ms. Included data had no substantial head motion and underwent motion correction. Volumes had a 64 x 64 matrix, 22-28 slices, and approximately 3.5 x 3.5 x 6 mm voxels. Inputs averaged four PWI repetitions; references averaged all available repetitions, including those four. Both input and target were PWI, not CBF."
+    ],
+    [
+      "Models",
+      "We adapted U-Net [4], Pix2Pix [5], SwinIR [2,6], and a HUST-inspired Swin U-Net [3] to three-slice pseudo-3D and true 3D prediction. Adaptations included single-channel intensity regression, anisotropic 3D operations, task-specific widths/windows, and GroupNorm in the convolutional models. SwinIR used six groups of six Swin blocks; the HUST-inspired model used three encoder and two decoder scales. Direct image prediction and residual prediction (adding the network output to the input) were evaluated for each model, yielding 16 configurations. All output heads were initialized to zero. Three-slice input followed Shou et al.'s denoising/CBF-bias compromise. M0 was excluded as an input channel because their M0-assisted models increased white-matter CBF bias despite improved similarity [2]; here M0 only defined a fixed foreground mask. BM4D and DT-CWT-NLM were classical 3D comparators [7,8]."
+    ],
+    [
+      "Training and evaluation",
+      "Source-derived min-max scaling was shared by input/reference without clipping. Training used 48 x 48 pseudo-3D crops or 16 x 48 x 48 3D crops, paired in-plane augmentation, Adam at an initial 2e-4, and at most 200 epochs. All networks used masked L1 + (1 - SSIM); Pix2Pix added foreground-weighted adversarial BCE (weight 0.01) and coordinated generator/discriminator learning-rate decay. Checkpoints were selected by mean validation reconstruction loss. All methods were evaluated on the same 54 cases and M0 foreground mask. SSIM used masked axial 7 x 7 Gaussian windows; PSNR used volume-wise error, both on the shared source scale. RMSE used original PWI units. Metrics were averaged equally across cases."
+    ]
+  ],
+  "results": [
+    "The low-SNR input achieved SSIM 0.8618 and PSNR 33.40 dB. BM4D and DT-CWT-NLM reached 0.8831/33.92 dB and 0.8877/34.16 dB, respectively. SwinIR and the HUST-inspired Swin U-Net achieved PSNRs of 37.19-37.43 dB across all input/output variants. Residual 3D Swin U-Net had the numerically highest mean SSIM (0.9220 +/- 0.0460) and PSNR (37.43 +/- 4.05 dB), with RMSE 5.44 versus 8.87 for the input. Residual 3D SwinIR was close (0.9217/37.39 dB).",
+    "Residual U-Net reached 36.87 dB in pseudo-3D and 36.86 dB in 3D, whereas direct-output variants reached only 24.94 and 29.94 dB. Pix2Pix reached 35.70-35.94 dB across variants. Volumetric transformers improved PSNR by only 0.05-0.23 dB over their corresponding pseudo-3D versions. Table 1 reports all configurations, and Figures 1-2 show the case-wise distributions. Figure 3 compares 3D residual predictions for two cases with lower and higher input SSIM, selected nearest the 25th and 75th percentiles of input similarity. No statistical superiority is claimed."
+  ],
+  "discussion": [
+    "SwinIR and the HUST-inspired Swin U-Net provided the strongest aggregate performance in this PWI benchmark, with relatively small differences between them. Three-slice pseudo-3D models offered a practical alternative to volumetric transformers, and residual U-Net remained competitive. The poor direct-output U-Net results emphasize the importance of output formulation under the tested initialization and training recipe. These findings concern the evaluated recipes, not architecture alone: capacities and training objectives differ. Validation also guided checkpoint selection, the reference retains noise shared with the input, and only one seed was evaluated. Independent testing and downstream perfusion assessment are needed before broader recommendations or clinical claims."
+  ],
+  "references": [
+    "Lindner T, Bolar DS, Achten E, et al. Current state and guidance on arterial spin labeling perfusion MRI in clinical neuroimaging. Magn Reson Med. 2023;89:2024-2047. doi:10.1002/mrm.29572.",
+    "Shou Q, Zhao C, Shao X, et al. Transformer-based deep learning denoising of single and multi-delay 3D arterial spin labeling. Magn Reson Med. 2024;91:803-818. doi:10.1002/mrm.29887.",
+    "Cheema MN, Zhang L, Nazir A, et al. Transformer-based arterial spin labeling perfusion MRI denoising. Vis Comput. 2025;41:10663-10673. doi:10.1007/s00371-025-04061-x.",
+    "Ronneberger O, Fischer P, Brox T. U-Net: Convolutional Networks for Biomedical Image Segmentation. MICCAI. 2015:234-241. doi:10.1007/978-3-319-24574-4_28.",
+    "Isola P, Zhu JY, Zhou T, Efros AA. Image-to-Image Translation with Conditional Adversarial Networks. CVPR. 2017. doi:10.1109/CVPR.2017.632.",
+    "Liang J, Cao J, Sun G, et al. SwinIR: Image Restoration Using Swin Transformer. ICCV Workshops. 2021:1833-1844. doi:10.1109/ICCVW54120.2021.00210.",
+    "Maggioni M, Katkovnik V, Egiazarian K, Foi A. Nonlocal transform-domain filter for volumetric data denoising and reconstruction. IEEE Trans Image Process. 2013;22:119-133. doi:10.1109/TIP.2012.2210725.",
+    "Liang X, Connelly A, Calamante F. Voxel-Wise Functional Connectomics Using Arterial Spin Labeling Functional Magnetic Resonance Imaging: The Role of Denoising. Brain Connect. 2015;5:543-553. doi:10.1089/brain.2014.0290."
+  ]
+}

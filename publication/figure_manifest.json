@@ -1,0 +1,14 @@
+[
+  {
+    "file": "quantitative_gres0.png",
+    "caption": "Figure 1. Case-level validation performance of direct-output models across 54 matched cases. Columns show pseudo-3D and volumetric 3D models; rows show SSIM, PSNR and MAE in original PWI units. Boxes span the interquartile range, center lines indicate medians, whiskers extend to the most extreme values within 1.5 interquartile ranges, black diamonds show means, and gray points show individual cases. Classical comparators are 3D methods. Higher SSIM/PSNR and lower MAE are better. All values are retained. Each metric shares a vertical scale across dimensions; Figures 1 and 2 have separate vertical limits."
+  },
+  {
+    "file": "quantitative_gres1.png",
+    "caption": "Figure 2. Case-level validation performance of residual-prediction models across 54 matched cases. Columns show pseudo-3D and volumetric 3D models; rows show SSIM, PSNR and MAE in original PWI units. Boxes span the interquartile range, center lines indicate medians, whiskers extend to the most extreme values within 1.5 interquartile ranges, black diamonds show means, and gray points show individual cases. Classical comparators are 3D methods. Higher SSIM/PSNR and lower MAE are better. All values are retained. Each metric shares a vertical scale across dimensions; Figures 1 and 2 have separate vertical limits."
+  },
+  {
+    "file": "qualitative_low_high.png",
+    "caption": "Figure 3. PWI and absolute-error comparisons for two cases with lower and higher input SSIM, selected nearest the 25th and 75th percentiles. Neural networks use 3D residual prediction; BM4D and DT-CWT-NLM are classical 3D comparators. Cases were selected by input similarity, without inspecting model outputs. The slice is at half the cumulative foreground voxel count. Within each case, PWI uses a shared reference-foreground volume P1–P99 window; errors use a shared upper limit of P95 of the input-to-reference absolute difference in the foreground volume. Color bars show original arbitrary PWI units; values above limits saturate for display only. Errors are shown within the common evaluation mask. Stored predictions and evaluation metrics are unchanged."
+  }
+]

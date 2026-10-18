@@ -1,0 +1,18 @@
+{
+  "source_project": "https://www.nitrc.org/projects/dt-cwt-nlm",
+  "release_archive_url": "https://www.nitrc.org/frs/download.php/9402/DT-CWT-NLM1.01.zip",
+  "release_archive_sha256": "c495f9d1813660b5821bdfdafc16adb6dfe073f79bc4bace6f19de1093af84a8",
+  "note": "The locally used ONLM binaries match the corresponding files in the official DT-CWT-NLM1.01 archive by SHA256. Binaries remain external dependencies and are not included.",
+  "files": {
+    "onlm.mexa64": {
+      "archive_path": "DT-CWT-NLM1.01/DTCWT-NLM_code/onlm.mexa64",
+      "sha256": "4cf838c5778dec02aade8b9ee270bd3b72a2c01b72d4db6a135a0c9b7cb85e4b",
+      "size_bytes": 12562
+    },
+    "onlm.mexw64": {
+      "archive_path": "DT-CWT-NLM1.01/DTCWT-NLM_code/onlm.mexw64",
+      "sha256": "8c650cce0805c0099b00ade6c3d0e61c8d56ed04bce2b435076baf4a12ced3ad",
+      "size_bytes": 15360
+    }
+  }
+}
