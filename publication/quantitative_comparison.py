@@ -10,6 +10,9 @@ import tempfile
 import numpy as np
 
 
+METRICS = ("ssim", "psnr", "mae_raw", "rmse_raw", "nmse_raw")
+
+
 def import_plotter(project_root, module_path=None):
     candidates = ([module_path] if module_path else [
         project_root / "GitHub_Release" / "DL" / "plot_comparison.py",
@@ -39,7 +42,9 @@ def result_row(folder, method, mode, run_name, plotter):
 
 
 def composite(plt, plotter, groups, output_stem, residual):
-    fig, axes = plt.subplots(3, 2, figsize=(18, 9.8), sharey="row")
+    from matplotlib.ticker import MaxNLocator
+
+    fig, axes = plt.subplots(len(METRICS), 2, figsize=(18, 9.8), sharey="row")
     for column, (mode, distributions, count) in enumerate(groups):
         methods = list(distributions)
         positions = np.arange(1, len(methods) + 1)
@@ -65,8 +70,9 @@ def composite(plt, plotter, groups, output_stem, residual):
             ax.set_axisbelow(True)
             ax.spines[["top", "right"]].set_visible(False)
             ax.margins(y=0.12)
+            ax.yaxis.set_major_locator(MaxNLocator(nbins=3))
             ax.set_xticks(positions)
-            if row == 2:
+            if row == len(METRICS) - 1:
                 ax.set_xticklabels([plotter.LABELS.get(m, m) for m in methods], fontsize=11)
                 ax.tick_params(axis="x", length=0, pad=9)
             else:
@@ -78,7 +84,7 @@ def composite(plt, plotter, groups, output_stem, residual):
                              transform=axes[0, column].transAxes, ha="center", fontsize=13)
     title = "Residual prediction" if residual else "Direct prediction"
     fig.suptitle(title, fontsize=14, y=0.99)
-    fig.subplots_adjust(left=0.065, right=0.99, top=0.89, bottom=0.09, hspace=0.28, wspace=0.10)
+    fig.subplots_adjust(left=0.065, right=0.99, top=0.89, bottom=0.09, hspace=0.45, wspace=0.10)
     for extension in plotter.SAVE_FORMATS:
         fig.savefig(output_stem.with_suffix("." + extension), dpi=300,
                     facecolor="white", bbox_inches="tight")
@@ -100,6 +106,8 @@ def main():
     dl_root = args.dl_result_root or data / "DLResult"
     traditional = args.traditional_root or data / "TraditionResult"
     plotter, module_path = import_plotter(project, args.plot_module)
+    plotter.METRICS = METRICS
+    plotter.METRIC_INFO.update(mae_raw="MAE (a.u.)", rmse_raw="RMSE (a.u.)", nmse_raw="NMSE")
     os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "asl_manuscript_matplotlib"))
     plotter.matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -109,7 +117,7 @@ def main():
     common_cases, common_protocol = None, None
     evidence = {"script": Path(__file__).name,
                 "plot_module_sha256": hashlib.sha256(module_path.read_bytes()).hexdigest(),
-                "run_prefix": "wtm0mask_ori", "groups": []}
+                "run_prefix": "wtm0mask_ori", "metrics": list(METRICS), "groups": []}
     for residual in (0, 1):
         groups = []
         run_name = f"wtm0mask_ori_gres{residual}_seed42"

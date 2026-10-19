@@ -5,19 +5,20 @@ import csv
 import json
 from copy import deepcopy
 from datetime import datetime, timezone
+from itertools import groupby
 from pathlib import Path
 
 from docx import Document
 from docx.enum.section import WD_ORIENT, WD_SECTION_START
-from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt, RGBColor
 
 
-METRICS = (("ssim", 4, max), ("psnr", 2, max), ("rmse_raw", 2, min))
-METHOD_NAMES = {"UNet": "U-Net", "SwinUNet": "Swin U-Net", "DTCWT_NLM": "DT-CWT-NLM"}
+METRICS = (("ssim", 4, max), ("psnr", 2, max), ("rmse_raw", 2, min), ("nmse_raw", 4, min))
+METHOD_NAMES = {"Input": "Noisy PWI", "UNet": "U-Net", "SwinUNet": "Swin U-Net", "DTCWT_NLM": "DT-CWT-NLM"}
 
 
 def text_value(value):
@@ -60,14 +61,12 @@ def border(parent, side, value, size=8):
 
 def add_table(doc, template, rows):
     paragraph(doc, template, 36, "Table 1. Validation results for all input and output configurations.").paragraph_format.page_break_before = True
-    paragraph(doc, template, 36,
-              "Mean ± sample standard deviation across 54 cases. Bold values mark the best overall mean "
-              "for each metric (higher SSIM/PSNR and lower RMSE). RMSE is in original PWI intensity units.")
-    table = doc.add_table(rows=1, cols=6)
+    paragraph(doc, template, 36, "Values are mean ± SD across 54 validation cases.")
+    table = doc.add_table(rows=1, cols=7)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
     usable = doc.sections[0].page_width - doc.sections[0].left_margin - doc.sections[0].right_margin
-    fractions = (0.195, 0.08, 0.115, 0.225, 0.205, 0.18)
+    fractions = (0.15, 0.115, 0.09, 0.17, 0.155, 0.15, 0.17)
     for column, fraction in zip(table.columns, fractions):
         column.width = int(usable * fraction)
     props = table._tbl.tblPr
@@ -75,7 +74,7 @@ def add_table(doc, template, rows):
     for side in ("top", "bottom", "left", "right", "insideH", "insideV"):
         border(table_borders, side, "single" if side in ("top", "bottom") else "nil", 10)
     props.append(table_borders)
-    for cell, text in zip(table.rows[0].cells, ("Method", "Input", "Output", "SSIM ↑", "PSNR (dB) ↑", "RMSE ↓")):
+    for cell, text in zip(table.rows[0].cells, ("Method", "Dimension", "Output", "SSIM ↑", "PSNR (dB) ↑", "RMSE ↓", "NMSE ↓")):
         cell.text = text
         borders = OxmlElement("w:tcBorders")
         border(borders, "bottom", "single", 6)
@@ -83,9 +82,10 @@ def add_table(doc, template, rows):
     table.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:tblHeader"))
     best = {name: choose(float(r[name + "_mean"]) for r in rows) for name, _, choose in METRICS}
     method_order = {name: i for i, name in enumerate(("Input", "BM4D", "DTCWT_NLM", "UNet", "Pix2Pix", "SwinUNet", "SwinIR"))}
-    rows = sorted(rows, key=lambda r: (
-        0 if r["method"] in ("Input", "BM4D", "DTCWT_NLM") else 1 if r["mode"] == "2.5d" else 2,
-        method_order[r["method"]], r["global_residual"]))
+    def group(row):
+        return 0 if row["method"] in ("Input", "BM4D", "DTCWT_NLM") else 1 if row["mode"] == "2.5d" else 2
+    rows = sorted(rows, key=lambda r: (group(r), method_order[r["method"]], r["global_residual"]))
+    group_starts = {i + 1 for i in range(1, len(rows)) if group(rows[i]) != group(rows[i - 1])}
     for row in rows:
         mode = "—" if row["method"] == "Input" else "2.5D" if row["mode"] == "2.5d" else "3D"
         output = {"False": "Direct", "True": "Residual", "": "—"}[row["global_residual"]]
@@ -94,17 +94,21 @@ def add_table(doc, template, rows):
                    for name, precision, _ in METRICS]
         cells = table.add_row().cells
         for i, (cell, value) in enumerate(zip(cells, values)):
-            cell.text = value
-            if i >= 3:
-                metric = METRICS[i - 3][0]
-                cell.paragraphs[0].runs[0].bold = float(row[metric + "_mean"]) == best[metric]
+            if i < 3:
+                cell.text = value
+            else:
+                metric, precision, _ = METRICS[i - 3]
+                p = cell.paragraphs[0]
+                mean = float(row[metric + "_mean"])
+                p.add_run(f"{mean:.{precision}f}").bold = mean == best[metric]
+                p.add_run(f" ± {float(row[metric + '_std']):.{precision}f}").bold = False
     for i, row in enumerate(table.rows):
         row._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
         for j, cell in enumerate(row.cells):
             cell.width = int(usable * fractions[j])
             for p in cell.paragraphs:
                 p.alignment = WD_ALIGN_PARAGRAPH.LEFT if j == 0 else WD_ALIGN_PARAGRAPH.CENTER
-                p.paragraph_format.space_before = Pt(3)
+                p.paragraph_format.space_before = Pt(7 if i in group_starts else 3)
                 p.paragraph_format.space_after = Pt(3)
                 p.paragraph_format.line_spacing = 1.0
                 p.paragraph_format.keep_with_next = True
@@ -114,9 +118,47 @@ def add_table(doc, template, rows):
                     r.font.color.rgb = RGBColor(0, 0, 0)
                     if i == 0:
                         r.bold = True
-    paragraph(doc, template, 36,
-              "All methods use the same validation cases, foreground mask and source-minmax evaluation. "
-              "Standard deviations describe between-case variation. The reference contains the four input repetitions.")
+    def merge_label(first, last, column):
+        label = table.cell(first, column).text
+        cell = table.cell(first, column).merge(table.cell(last, column))
+        cell.text = label
+        cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT if column == 0 else WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_before = Pt(3)
+        p.paragraph_format.space_after = Pt(3)
+        p.paragraph_format.line_spacing = 1.0
+        p.paragraph_format.keep_with_next = True
+        for run in p.runs:
+            run.font.name = "Arial"
+            run.font.size = Pt(6.5)
+            run.font.color.rgb = RGBColor(0, 0, 0)
+            run.bold = False
+
+    for _, members in groupby(enumerate(rows, 1), key=lambda item: (group(item[1]), item[1]["method"])):
+        indices = [index for index, _ in members]
+        if len(indices) > 1:
+            merge_label(indices[0], indices[-1], 0)
+    for _, members in groupby(enumerate(rows, 1), key=lambda item: (group(item[1]), item[1]["method"] == "Input")):
+        indices = [index for index, _ in members]
+        if len(indices) > 1:
+            merge_label(indices[0], indices[-1], 1)
+
+    for index, row in enumerate(rows[1:], 2):
+        previous = rows[index - 2]
+        major = row["method"] == "BM4D" or group(row) != group(previous)
+        if not major and row["method"] == previous["method"]:
+            continue
+        columns = range(7) if major else (0, 2, 3, 4, 5, 6)
+        for column in columns:
+            # Raw cells preserve the position of vertically merged labels.
+            cell = table.rows[index]._tr.tc_lst[column]
+            props = cell.get_or_add_tcPr()
+            borders = props.find(qn("w:tcBorders"))
+            if borders is None:
+                borders = OxmlElement("w:tcBorders")
+                props.append(borders)
+            border(borders, "top", "single", 6 if major else 3)
 
 
 def build(args):
@@ -148,10 +190,11 @@ def build(args):
     core = doc.core_properties
     core.title = content["title"]
     core.subject = "ASL PWI denoising benchmark: validation-set abstract draft"
-    core.author = core.last_modified_by = ""
+    core.author = content["authors"]
+    core.last_modified_by = ""
     core.comments = "Formatting follows the supplied abstract template."
     core.created = core.modified = datetime(2026, 10, 18, tzinfo=timezone.utc)
-    core.revision = 2
+    core.revision = 3
 
     paragraph(doc, template, 0, "Title:")
     paragraph(doc, template, 1, content["title"])

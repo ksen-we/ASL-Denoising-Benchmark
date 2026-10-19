@@ -18,18 +18,18 @@ python publication/validation_table.py \
   --output-dir publication/generated
 ```
 
-The plotting scripts require NumPy, Matplotlib and NiBabel. The quantitative script also loads the existing `DL/plot_comparison.py` to preserve its case/protocol checks and plotting style. Separate 2.5D and 3D plots are saved in addition to the composites.
+The plotting scripts require NumPy, Matplotlib and NiBabel. The quantitative script also loads the existing `DL/plot_comparison.py` to preserve its checks of cases and evaluation protocols and its plotting style. Separate 2.5D and 3D plots are saved in addition to the composites.
 
 | Manuscript item | Output stem | Generator |
 | --- | --- | --- |
 | Figure 1: direct-output distributions | `quantitative_gres0` | `quantitative_comparison.py` |
 | Figure 2: residual-output distributions | `quantitative_gres1` | `quantitative_comparison.py` |
-| Figure 3: lower/higher input SSIM, 3D residual models | `qualitative_low_high` | `qualitative_comparison.py` |
+| Figure 3: lower and higher input SSIM, 3D residual models | `qualitative_low_high` | `qualitative_comparison.py` |
 | Table 1: all recorded configurations | `validation_table` | `validation_table.py` |
 
-Each figure/table is saved as PNG and PDF. Figures 1-2 show SSIM, PSNR, MAE, RMSE and NMSE; Table 1 shows SSIM, PSNR, RMSE and NMSE. RMSE retains original PWI intensity units, while NMSE is dimensionless squared-error energy divided by reference signal energy within the evaluation mask. Each case is weighted equally.
+Each figure and table is saved as PNG and PDF. Figures 1 and 2 show SSIM, PSNR, MAE, RMSE and NMSE; Table 1 shows SSIM, PSNR, RMSE and NMSE. Each case is weighted equally. Metric definitions are given in [Methods](../docs/METHODS.md).
 
-The editable Word table is built independently from the same summary CSV, with the same best-value rule. Spacing separates the baseline/classical, 2.5D and 3D groups. Only best overall means are bold; their standard deviations remain in normal type. Bold indicates the numerical best, not statistical significance.
+The editable Word table is built from the same summary CSV. Repeated model and dimension labels are merged vertically. Full-width horizontal rules separate the input baseline, classical methods, 2.5D models, and 3D models; finer rules separate networks without crossing the merged dimension labels. Direct and residual rows remain paired. Best means are bold; standard deviations remain in normal type. Captions identify each comparison without repeating the metric definitions.
 
 ## Qualitative selection and display
 
@@ -37,11 +37,11 @@ Two cases are selected using input SSIM nearest the 25th and 75th validation-set
 
 Within each case, all methods share the reference-foreground P1–P99 display window and the P95 input-to-reference absolute-error upper limit. These display settings do not alter predictions or evaluation metrics. Error maps use the common evaluation mask. Native voxels are displayed with nearest-neighbor rendering and no spatial resampling.
 
-`qualitative_selection.json` records the exact cases, slices, display ranges and source checksums. It contains private identifiers and stays beside the local figures. It is not included in the upload package. The figure uses anonymous Lower SSIM / Higher SSIM labels.
+`qualitative_selection.json` records the exact cases, slices, display ranges and source checksums. It contains private identifiers and stays beside the local figures. It is not included in the upload package. The figure uses anonymous Lower SSIM and Higher SSIM labels.
 
 ## Word document
 
-Install `python-docx>=1.2,<2` in addition to the plotting dependencies. Edit `manuscript_content.json` for the text and `figure_manifest.json` for the selected images/captions, then run:
+Install `python-docx>=1.2,<2` in addition to the plotting dependencies. Edit `manuscript_content.json` for the text and `figure_manifest.json` for the selected images and captions, then run:
 
 ```bash
 python publication/build_manuscript.py \
@@ -52,6 +52,6 @@ python publication/build_manuscript.py \
   --output publication/generated/ASL_Denoising_Abstract.docx
 ```
 
-The builder copies the supplied reference's paragraph formatting and portrait page geometry: Arial, 6.5 pt body text and 12 pt section labels. It preserves the section framework, including the singular `Reference` heading. Comparison figures use separate landscape pages for readability. The table is editable and uses three black horizontal rules. Template study text, authors, images and metadata are not copied.
+The builder copies the supplied reference's paragraph formatting and portrait page geometry: Arial, 6.5 pt body text and 12 pt section labels. It preserves the section framework, including the singular `Reference` heading. Comparison figures use separate landscape pages for readability. The table is editable and uses black horizontal rules with lighter method separators. Template study text, authors, images and metadata are not copied.
 
-The DOCX can be exported to PDF in Word or LibreOffice. The original reference DOCX is not distributed. The author order is confirmed; affiliations and OS cohort details remain to be confirmed. Generated images and the private selection manifest are not included in this repository.
+The DOCX can be exported to PDF in Word or LibreOffice. The original reference DOCX is not distributed. The author order is confirmed; affiliations and two cohort names remain to be confirmed. Generated images and the private selection manifest are not included in this repository.

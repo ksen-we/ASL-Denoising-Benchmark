@@ -185,13 +185,13 @@ def volumes(case, mode, gres):
             *(case["predictions"][(m, mode, gres)] for m in METHODS), case["reference"]]
 
 
-def draw_figure(groups, title, subtitle, output_stem, dpi):
+def draw_figure(groups, title, output_stem, dpi):
     plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 12,
                          "pdf.fonttype": 42, "ps.fonttype": 42})
     nrows = len(groups) * 2
     fig = plt.figure(figsize=(22.0, 1.5 + nrows * 2.5), facecolor="white")
     grid = fig.add_gridspec(nrows, 9, width_ratios=[1] * 8 + [0.055],
-                           left=0.08, right=0.96, top=0.88, bottom=0.035,
+                           left=0.08, right=0.96, top=0.90, bottom=0.035,
                            wspace=0.035, hspace=0.075)
     error_cmap = plt.get_cmap("magma").copy()
     error_cmap.set_bad("black")
@@ -231,7 +231,6 @@ def draw_figure(groups, title, subtitle, output_stem, dpi):
             cbar.update_ticks()
             cbar.ax.set_title("a.u.", fontsize=10, pad=7)
     fig.text(0.08, 0.972, title, fontsize=19, fontweight="bold", ha="left", va="top")
-    fig.text(0.08, 0.936, subtitle, fontsize=12.5, ha="left", va="top", color="#333333")
     for extension in ("png", "pdf"):
         fig.savefig(output_stem.with_suffix("." + extension), dpi=dpi, facecolor="white")
     plt.close(fig)
@@ -253,24 +252,16 @@ def main():
     selection = select_cases(baseline)
     cases = [load_case(root, args.split, selected, folders) for selected in selection]
     captions = {}
-    common = ("Cases were selected before inspecting model outputs, using the nearest input-SSIM "
-              "values to the validation-set quartiles. The displayed axial slice is the median of "
-              "the cumulative foreground voxel count. Images retain native voxels; orientation "
-              "changes use axis flips/permutations without interpolation. For each case, every PWI "
-              "shares the reference-foreground P1–P99 display window, and every absolute-error map "
-              "shares the P95 input-to-reference absolute-error upper limit. Errors are displayed "
-              "within the common evaluation mask; high errors may saturate. These display windows "
-              "do not change predictions or evaluation metrics. Signal and error color bars use "
-              "the original arbitrary intensity units. BM4D and DT-CWT-NLM are 3D methods.")
+    common = ("Neural networks use 3D residual prediction. Within each case, all methods share "
+              "the reference-foreground P1–P99 intensity window and the input-error P95 upper limit. "
+              "Error maps use the common foreground mask; color bars indicate original PWI intensity units.")
     stem = "qualitative_low_high"
     draw_figure([(case, "3D", 1, case["selection"]["label"]) for case in cases],
                 "PWI denoising with 3D residual prediction",
-                f"Lower input SSIM: {cases[0]['selection']['input_ssim']:.3f}  |  "
-                f"Higher input SSIM: {cases[1]['selection']['input_ssim']:.3f}  |  Windows shared within each case",
                 args.output_dir / stem, args.dpi)
-    captions[stem] = ("Qualitative examples near the lower and upper input-SSIM quartiles, "
-                      "showing 3D networks with residual prediction alongside the input, classical "
-                      "methods and reference. Each row pair shows PWI above absolute error. " + common)
+    captions[stem] = ("PWI and absolute error for cases nearest the 25th and 75th percentiles of input SSIM "
+                      f"({cases[0]['selection']['input_ssim']:.3f} and "
+                      f"{cases[1]['selection']['input_ssim']:.3f}). " + common)
     (args.output_dir / "qualitative_captions.json").write_text(json.dumps(captions, indent=2), encoding="utf-8")
     manifest = {"private": True, "run_prefix": args.run_prefix, "seed": args.seed,
                 "split": args.split, "number_of_cases": len(baseline), "expected_cases": args.expected_cases,
