@@ -1,6 +1,6 @@
 # Methods and references
 
-These are task-adapted baselines, not exact reproductions of the cited networks. All methods use the same pairs of four-repeat inputs and 18-repeat references, foreground region, and evaluation definitions. Deep learning models share the data split and reconstruction objective; model capacities and the Pix2Pix adversarial objective differ.
+These are task-adapted baselines, not exact reproductions of the cited networks. All methods use the same pairs of four-repeat inputs and 18-repeat references, foreground region, and evaluation definitions. All networks share the same PWI denoising task, data split, and reconstruction loss. Model sizes differ, and Pix2Pix additionally includes an adversarial loss.
 
 ## Models
 

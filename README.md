@@ -13,8 +13,8 @@ The study contains **271 cases: 217 training and 54 validation cases**. The coho
 | Healthy controls | 67 |
 | Stroke | 103 |
 | Obstructive sleep apnea (OSA) | 59 |
-|  | 14 |
-|  | 28 |
+| COPD | 14 |
+| OS | 28 |
 
 All acquisitions use a **GRASE readout**. Post-labeling delays (PLDs) are **1500 ms in 79 cases, 1800 ms in 124 cases, and 2000 ms in 68 cases**. Preprocessing includes motion correction, and the included data were screened to exclude substantial head motion. PWI volumes have a 64 x 64 in-plane matrix and approximately 3.5 x 3.5 x 6 mm voxels.
 
