@@ -21,10 +21,8 @@ Existing predictions are preserved by default.
 
 ## Evaluation
 
-The default `minmax` normalization and `legacy` evaluation match the final
-`wtm0mask_ori` deep learning runs. The evaluation label is
-`wtm0mask_seed42`, and reports are saved in
-`evaluation/val/wtM0mask/` under each method's result directory.
+Evaluation reports are saved in `evaluation/val/wtM0mask/` under each
+method's result directory.
 
 Evaluation uses the same source-derived scale, M0 foreground mask and
 metric functions as `DL/common`. Do not normalize predictions separately.
