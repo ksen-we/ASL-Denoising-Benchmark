@@ -1,21 +1,21 @@
 # Methods and references
 
-These are task-adapted baselines, not exact reproductions of the cited networks. The comparison keeps input/reference pairs, data split, foreground region, reconstruction objective, and evaluation definitions consistent. Model capacities and the Pix2Pix adversarial objective differ.
+These are task-adapted baselines, not exact reproductions of the cited networks. All methods use the same pairs of four-repeat inputs and 18-repeat references, foreground region, and evaluation definitions. Deep learning models share the data split and reconstruction objective; model capacities and the Pix2Pix adversarial objective differ.
 
 ## Models
 
 | Model | Adaptation used here |
 | --- | --- |
-| U-Net | Four encoder scales (32/64/128/256 channels), three decoder scales, GroupNorm, and a linear single-channel regression head. |
+| U-Net | Four encoder scales with 32, 64, 128, and 256 channels, three decoder scales, GroupNorm, and a linear single-channel regression head. |
 | Pix2Pix | A compact U-Net generator with a conditional PatchGAN discriminator; GroupNorm, decoder dropout, signed PWI regression, and foreground-weighted adversarial BCE. |
-| SwinIR | 60 features, six residual groups with six Swin blocks each, alternating window/shifted-window attention, and a single-channel output head. |
-| HUST-inspired Swin U-Net | Three encoder scales (48/96/192 channels), two decoder scales, patch merging, Swin blocks, and fused transposed-convolution/interpolation upsampling. |
+| SwinIR | 60 features, six residual groups with six Swin blocks each, alternating window and shifted-window attention, and a single-channel output head. |
+| SwinUNet | Adapted from the HUST architecture described by Cheema et al.: three encoder scales with 48, 96, and 192 channels, two decoder scales, patch merging, Swin blocks, and fused transposed-convolution and interpolation upsampling. |
 
-Pseudo-3D models take three adjacent PWI slices and predict the center slice. The three-slice choice follows the denoising/CBF-bias compromise discussed by Shou et al.; it is not a claim that three slices maximize every similarity metric. Their M0 experiment improved image similarity but increased white-matter CBF bias, motivating omission of M0 as an additional image channel here. This choice was not separately optimized on this cohort.
+Pseudo-3D models take three adjacent PWI slices and predict the center slice. This choice follows Shou et al.'s reported balance between denoising performance and CBF bias. Their M0 experiment improved image similarity but increased white-matter CBF bias, motivating omission of M0 as an additional image channel here. Neither input choice was separately optimized on this cohort.
 
 Volumetric versions use 3D operations, including anisotropic downsampling where applicable. Training crops are 48 x 48 for pseudo-3D and 16 x 48 x 48 (depth, height, width) for 3D. Batch sizes are 16 and 1, respectively. Models retain the native voxel grid; internal padding is cropped from the output.
 
-All models support direct prediction (`gres0`) and a final addition of the input volume or center slice (`gres1`). Output heads are zero-initialized. The residual addition introduces no trainable parameters. Parameter counts are not matched across architectures.
+All models support direct prediction and residual prediction, in which the input volume or center slice is added to the network output. The final output-convolution weights and biases are initialized to zero. On the normalized training scale, the initial direct prediction is therefore zero, while the initial residual prediction equals the input. The residual addition introduces no trainable parameters. Parameter counts are not matched across architectures.
 
 ## Training
 
@@ -25,21 +25,21 @@ Pix2Pix adds an adversarial term weighted by 0.01. Generator and discriminator l
 
 ## Evaluation
 
-The final `wtm0mask_ori` results use `normalization="minmax"` and `evaluation_protocol="legacy"`. A fixed M0-derived foreground mask is intersected with finite source and reference voxels. The mask may include non-brain tissue and should not be described as a brain segmentation.
+The reported results use input-derived min–max scaling and a shared evaluation protocol. A fixed M0-derived foreground mask is intersected with finite source and reference voxels. The mask may include non-brain tissue and should not be described as a brain segmentation.
 
-The source image's full finite field of view determines a common offset and scale. SSIM is computed on axial slices with a 7 x 7 Gaussian window (sigma 1.5, data range 1), using masked local statistics and valid-voxel aggregation. PSNR uses the volume-wide masked mean squared error on the same scale. Predictions are not independently normalized or clipped. MAE and RMSE are reported in original PWI intensity units; NMSE is the raw mean squared error divided by the reference signal energy and is dimensionless. Cases receive equal weight in the reported mean and sample standard deviation.
+The source image's full finite field of view determines a common offset and scale. SSIM is computed on axial slices with a 7 x 7 Gaussian window (sigma 1.5, data range 1), using masked local statistics and valid-voxel aggregation. PSNR uses the volume-wide masked mean squared error on the same scale. Predictions are not independently normalized or clipped. MAE and RMSE are reported in original PWI intensity units; NMSE is the sum of squared errors divided by the sum of squared reference intensities within the evaluation mask. Cases receive equal weight in the reported mean and sample standard deviation.
 
 Classical predictions use the same evaluation functions as the networks. Their internal denoising scales remain method-specific. BM4D results correspond to the local CUDA implementation; the optional official CPU backend is not numerically interchangeable with it.
 
-The validation cohort is also used for checkpoint selection. The higher-SNR reference contains the four repetitions used in the input, so input and reference noise are correlated. Scores describe this validation setting; they do not establish independent generalization, CBF accuracy, or clinical effectiveness. No statistical significance or universally optimal architecture is claimed.
+The validation cohort is also used for checkpoint selection. The 18-repeat reference contains the four repetitions used in the input, so input and reference noise are correlated. Scores describe this validation setting; they do not establish independent generalization, CBF accuracy, or clinical effectiveness. No statistical significance or universally optimal architecture is claimed.
 
 ## References
 
-- Lindner T, et al. Current state and guidance on arterial spin labeling perfusion MRI in clinical neuroimaging. *Magn Reson Med*. 2023;89:2024-2047. [doi:10.1002/mrm.29572](https://doi.org/10.1002/mrm.29572).
-- Shou Q, et al. Transformer-based deep learning denoising of single and multi-delay 3D arterial spin labeling. *Magn Reson Med*. 2024;91:803-818. [doi:10.1002/mrm.29887](https://doi.org/10.1002/mrm.29887).
-- Liang J, et al. SwinIR: Image Restoration Using Swin Transformer. *ICCV Workshops*. 2021. [Paper](https://openaccess.thecvf.com/content/ICCV2021W/AIM/html/Liang_SwinIR_Image_Restoration_Using_Swin_Transformer_ICCVW_2021_paper.html).
-- Cheema MN, et al. Transformer-based arterial spin labeling perfusion MRI denoising. *The Visual Computer*. 2025;41:10663-10673. [doi:10.1007/s00371-025-04061-x](https://doi.org/10.1007/s00371-025-04061-x).
-- Ronneberger O, et al. U-Net: Convolutional Networks for Biomedical Image Segmentation. *MICCAI*. 2015. [doi:10.1007/978-3-319-24574-4_28](https://doi.org/10.1007/978-3-319-24574-4_28).
-- Isola P, et al. Image-to-Image Translation with Conditional Adversarial Networks. *CVPR*. 2017. [Paper](https://openaccess.thecvf.com/content_cvpr_2017/html/Isola_Image-To-Image_Translation_With_CVPR_2017_paper.html).
-- Maggioni M, et al. Nonlocal transform-domain filter for volumetric data denoising and reconstruction. *IEEE Trans Image Process*. 2013;22:119-133. [doi:10.1109/TIP.2012.2210725](https://doi.org/10.1109/TIP.2012.2210725).
-- Liang X, Connelly A, Calamante F. Voxel-Wise Functional Connectomics Using Arterial Spin Labeling Functional Magnetic Resonance Imaging: The Role of Denoising. *Brain Connect*. 2015;5:543-553. [doi:10.1089/brain.2014.0290](https://doi.org/10.1089/brain.2014.0290).
+1. Lindner T, Bolar D S, Achten E, et al. Current state and guidance on arterial spin labeling perfusion MRI in clinical neuroimaging[J]. Magnetic resonance in medicine, 2023, 89(5): 2024-2047.
+2. Shou Q, Zhao C, Shao X, et al. Transformer‐based deep learning denoising of single and multi‐delay 3D arterial spin labeling[J]. Magnetic resonance in medicine, 2024, 91(2): 803-818.
+3. Cheema M N, Zhang L, Nazir A, et al. Transformer-based arterial spin labeling perfusion MRI denoising[J]. The Visual Computer, 2025, 41(13): 10663-10673.
+4. Ronneberger O, Fischer P, Brox T. U-net: Convolutional networks for biomedical image segmentation[C]//International Conference on Medical image computing and computer-assisted intervention. Cham: Springer international publishing, 2015: 234-241.
+5. Isola P, Zhu J Y, Zhou T, et al. Image-to-image translation with conditional adversarial networks[C]//2017 IEEE conference on computer vision and pattern recognition (CVPR). Ieee, 2017: 5967-5976.
+6. Liang J, Cao J, Sun G, et al. Swinir: Image restoration using swin transformer[C]//2021 IEEE/CVF international conference on computer vision workshops (ICCVW). IEEE, 2021: 1833-1844.
+7. Maggioni M, Katkovnik V, Egiazarian K, et al. Nonlocal transform-domain filter for volumetric data denoising and reconstruction[J]. IEEE transactions on image processing, 2012, 22(1): 119-133.
+8. Liang X, Connelly A, Calamante F. Voxel-wise functional connectomics using arterial spin labeling functional magnetic resonance imaging: the role of denoising[J]. Brain connectivity, 2015, 5(9): 543-553.
