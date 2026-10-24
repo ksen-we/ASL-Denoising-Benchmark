@@ -1,14 +1,6 @@
 [
   {
-    "file": "quantitative_gres0.png",
-    "caption": "Figure 1. Validation performance of direct prediction across 54 cases. The left and right columns show 2.5D and 3D methods, respectively. Boxes indicate medians and interquartile ranges; whiskers follow the 1.5-IQR rule. Diamonds denote means and points denote individual cases."
-  },
-  {
-    "file": "quantitative_gres1.png",
-    "caption": "Figure 2. Validation performance of residual prediction across the same 54 cases. Panel arrangement and plotting conventions follow Figure 1. Vertical axis limits differ from Figure 1."
-  },
-  {
     "file": "qualitative_low_high.png",
-    "caption": "Figure 3. PWI and absolute error for cases nearest the 25th and 75th percentiles of input SSIM (0.817 and 0.918). Neural networks use 3D residual prediction. Within each case, all methods share the reference-foreground P1–P99 intensity window and the input-error P95 upper limit. Error maps use the common foreground mask; color bars indicate original PWI intensity units."
+    "caption": "Figure 1. PWI denoising in two cases. Inputs and references are averages of 4 and 18 repetitions. Networks use 3D residual prediction. Scores show PSNR (dB) then SSIM; scales are shared within each case."
   }
 ]

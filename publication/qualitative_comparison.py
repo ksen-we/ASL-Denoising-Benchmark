@@ -26,8 +26,8 @@ from matplotlib import colors, ticker
 
 
 METHODS = ("UNet", "Pix2Pix", "SwinUNet", "SwinIR")
-LABELS = ("Low-SNR\ninput", "BM4D\n(3D)", "DT-CWT-NLM\n(3D)",
-          "U-Net", "Pix2Pix", "Swin U-Net", "SwinIR", "Reference")
+LABELS = ("4-repeat\ninput", "BM4D\n(3D)", "DT-CWT-NLM\n(3D)",
+          "U-Net", "Pix2Pix", "Swin U-Net", "SwinIR", "18-repeat\nreference")
 MODES = (("2p5D", "2.5d", "2.5D"), ("3D", "3d", "3D"))
 INPUT_METRICS = ("input_ssim", "input_psnr", "input_mae_raw", "input_rmse_raw", "input_nmse_raw")
 
@@ -51,7 +51,22 @@ def read_metrics(folder):
 
 def check_runs(root, split, prefix, seed, expected_cases):
     folders, baseline, identities, baseline_metrics = {}, None, [], None
+    reports = {}
     fingerprint = None
+
+    def retain_report(key, folder, records, provenance):
+        scores = [[float(row[name]) for name in ("psnr", "ssim")]
+                  for row in records.values()]
+        if not np.isfinite(scores).all():
+            raise ValueError(f"Nonfinite annotation metrics: {folder}")
+        reports[key] = {
+            "records": records,
+            "source": {"metrics_csv": str((folder / "metrics.csv").relative_to(root)),
+                       "metrics_sha256": sha256(folder / "metrics.csv"),
+                       "provenance_json": str((folder / "provenance.json").relative_to(root)),
+                       "provenance_sha256": sha256(folder / "provenance.json"),
+                       "metric_protocol": provenance["metric_protocol"]},
+        }
 
     def protocol(provenance):
         cfg = provenance["config"]
@@ -95,6 +110,7 @@ def check_runs(root, split, prefix, seed, expected_cases):
                     baseline = current
                     baseline_metrics = current_metrics
                 folders[(method, disk_mode, gres)] = folder
+                retain_report((method, disk_mode, gres), folder, records, provenance)
                 identities.append({"folder": str(folder.relative_to(root)),
                                    "metrics_sha256": sha256(folder / "metrics.csv"),
                                    "provenance_sha256": sha256(folder / "provenance.json")})
@@ -108,10 +124,11 @@ def check_runs(root, split, prefix, seed, expected_cases):
         if protocol(provenance) != fingerprint:
             raise ValueError("Classical and DL evaluation protocols differ.")
         check_baseline(records)
+        retain_report((method, "3D", None), folder, records, provenance)
         identities.append({"folder": str(folder.relative_to(root)),
                            "metrics_sha256": sha256(folder / "metrics.csv"),
                            "provenance_sha256": sha256(folder / "provenance.json")})
-    return folders, baseline, identities
+    return folders, baseline, identities, reports
 
 
 def select_cases(baseline):
@@ -185,54 +202,127 @@ def volumes(case, mode, gres):
             *(case["predictions"][(m, mode, gres)] for m in METHODS), case["reference"]]
 
 
-def draw_figure(groups, title, output_stem, dpi):
+def attach_annotations(case, reports, mode, gres):
+    keys = [("UNet", mode, gres), ("BM4D", "3D", None),
+            ("DTCWT_NLM", "3D", None), *((method, mode, gres) for method in METHODS)]
+    entries = []
+    for column, key in enumerate(keys):
+        report = reports[key]
+        row = report["records"][case["selection"]["case"]]
+        prefix = "input_" if column == 0 else ""
+        values = {name: float(row[prefix + name]) for name in ("psnr", "ssim")}
+        entries.append({"column": column, "label": LABELS[column].replace("\n", " "),
+                        **values,
+                        "display_text": f"{values['psnr']:.2f} | {values['ssim']:.4f}",
+                        "source_fields": {name: prefix + name for name in values},
+                        "source": report["source"]})
+    case["annotations"] = entries
+    case["annotation_configuration"] = (mode, gres)
+    case["selection"]["metric_annotations"] = {
+        "scope": "whole_volume", "normalization": "minmax", "evaluation_protocol": "legacy",
+        "display_normalization_used_for_metrics": False, "panels": entries,
+    }
+
+
+def draw_figure(groups, output_stem, dpi):
     plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 12,
                          "pdf.fonttype": 42, "ps.fonttype": 42})
-    nrows = len(groups) * 2
-    fig = plt.figure(figsize=(22.0, 1.5 + nrows * 2.5), facecolor="white")
-    grid = fig.add_gridspec(nrows, 9, width_ratios=[1] * 8 + [0.055],
-                           left=0.08, right=0.96, top=0.90, bottom=0.035,
-                           wspace=0.035, hspace=0.075)
+    width, image_size, band_height = 4.25, 0.86, 0.15
+    left, column_gap, case_gap = 0.17, 0.04, 0.08
+    case_heading, method_heading = 0.19, 0.15
+    pair_gap, subset_gap = 0.025, 0.025
+    block_height = case_heading + 2 * (method_heading + band_height + pair_gap) + 4 * image_size + subset_gap
+    height = 0.04 + len(groups) * block_height + (len(groups) - 1) * case_gap + 0.07
+    fig = plt.figure(figsize=(width, height), facecolor="white")
+
+    def axes(x, y, w, h, facecolor="white"):
+        ax = fig.add_axes([x / width, y / height, w / width, h / height], facecolor=facecolor)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        return ax
+
     error_cmap = plt.get_cmap("magma").copy()
     error_cmap.set_bad("black")
     gray_cmap = plt.get_cmap("gray").copy()
     gray_cmap.set_bad("black")
+    panel_order = ((0, 1, 2, 7), (3, 4, 5, 6))
+    display_labels = ("4-repeat input", "BM4D", "DT-CWT-NLM", "U-Net", "Pix2Pix",
+                      "Swin U-Net", "SwinIR", "18-repeat ref.")
+    top = height - 0.04
     for group_index, (case, mode, gres, group_label) in enumerate(groups):
+        if case["annotation_configuration"] != (mode, gres):
+            raise ValueError("Annotation metrics do not match the displayed configuration.")
         images = volumes(case, mode, gres)
         z = case["z"]
         plane_mask = np.rot90(case["mask"][:, :, z])
-        for error in (False, True):
-            row = 2 * group_index + int(error)
-            cmap = error_cmap if error else gray_cmap
-            norm = colors.Normalize(0, case["error_max"]) if error else colors.Normalize(*case["pwi_limits"])
-            for col, volume in enumerate(images):
-                ax = fig.add_subplot(grid[row, col])
-                if error:
-                    plane = np.rot90(np.abs(volume[:, :, z] - case["reference"][:, :, z]))
-                    plane = np.ma.masked_where(~plane_mask, plane)
-                else:
-                    plane = np.ma.masked_invalid(np.rot90(volume[:, :, z]))
-                artist = ax.imshow(plane, cmap=cmap, norm=norm, interpolation="nearest")
-                ax.set_xticks([])
-                ax.set_yticks([])
-                for spine in ax.spines.values():
-                    spine.set_visible(False)
-                if row == 0:
-                    ax.set_title(LABELS[col], fontsize=13, fontweight="bold", pad=9)
-                if col == 0:
-                    label = "Absolute\nerror" if error else group_label + "\nPWI"
-                    ax.set_ylabel(label, fontsize=13, labelpad=11, rotation=0,
-                                  va="center", ha="right", fontweight="bold")
-            cax = fig.add_subplot(grid[row, 8])
-            cbar = fig.colorbar(artist, cax=cax)
-            cbar.outline.set_linewidth(0.5)
-            cbar.ax.tick_params(labelsize=11, width=0.5, length=3)
-            cbar.locator = ticker.MaxNLocator(nbins=3)
-            cbar.update_ticks()
-    fig.text(0.08, 0.972, title, fontsize=19, fontweight="bold", ha="left", va="top")
+        case_title = group_label.replace(" SSIM", " input SSIM")
+        fig.text(left / width, top / height,
+                 f"{chr(65 + group_index)}  {case_title}", fontsize=10.5,
+                 fontweight="bold", ha="left", va="top")
+        top -= case_heading
+        for subset_index, indices in enumerate(panel_order):
+            for col, index in enumerate(indices):
+                x = left + col * (image_size + column_gap)
+                fig.text((x + image_size / 2) / width, top / height,
+                         display_labels[index], fontsize=9, fontstretch="condensed",
+                         ha="center", va="top")
+            top -= method_heading
+            for error in (False, True):
+                if not error:
+                    top -= band_height
+                    for col, index in enumerate(indices):
+                        x = left + col * (image_size + column_gap)
+                        band = axes(x, top, image_size, band_height, facecolor="black")
+                        if index < len(case["annotations"]):
+                            band.text(0.97, 0.50, case["annotations"][index]["display_text"],
+                                      transform=band.transAxes, ha="right", va="center",
+                                      color="white", fontsize=7.2)
+                        else:
+                            band.text(0.50, 0.50, "PSNR | SSIM", transform=band.transAxes,
+                                      ha="center", va="center", color="white", fontsize=8)
+                top -= image_size
+                cmap = error_cmap if error else gray_cmap
+                norm = colors.Normalize(0, case["error_max"]) if error else colors.Normalize(*case["pwi_limits"])
+                for col, index in enumerate(indices):
+                    volume = images[index]
+                    ax = axes(left + col * (image_size + column_gap), top, image_size, image_size)
+                    if error:
+                        plane = np.rot90(np.abs(volume[:, :, z] - case["reference"][:, :, z]))
+                        plane = np.ma.masked_where(~plane_mask, plane)
+                    else:
+                        plane = np.ma.masked_invalid(np.rot90(volume[:, :, z]))
+                    artist = ax.imshow(plane, cmap=cmap, norm=norm, interpolation="nearest")
+                fig.text((left - 0.03) / width, (top + image_size / 2) / height,
+                         "Absolute error" if error else "PWI", fontsize=8.2,
+                         ha="right", va="center", rotation=90)
+                if subset_index == 1:
+                    cax = axes(left + 4 * image_size + 3 * column_gap + 0.05,
+                               top, 0.035, image_size)
+                    cbar = fig.colorbar(artist, cax=cax)
+                    cbar.outline.set_linewidth(0.4)
+                    cbar.ax.tick_params(labelsize=7.6, width=0.4, length=2, pad=2)
+                    cbar.locator = ticker.MaxNLocator(nbins=3)
+                    cbar.update_ticks()
+                if not error:
+                    top -= pair_gap
+            if subset_index == 0:
+                top -= subset_gap
+        top -= case_gap
     for extension in ("png", "pdf"):
         fig.savefig(output_stem.with_suffix("." + extension), dpi=dpi, facecolor="white")
     plt.close(fig)
+    return {"orientation": "portrait", "figure_size_inches": [width, height],
+            "columns": 4, "image_rows": 4 * len(groups),
+            "method_indices_by_pwi_row_within_case": [list(row) for row in panel_order],
+            "display_labels": list(display_labels), "image_panel_size_inches": image_size,
+            "annotation_lines": ["PSNR in dB (two decimal places) | SSIM (four decimal places)"],
+            "annotation_font_points": 7.2, "method_font_points": 9,
+            "reference_legend_font_points": 8,
+            "reference_score_legend": "PSNR | SSIM",
+            "case_heading_font_points": 10.5, "row_label_font_points": 8.2,
+            "colorbar_tick_font_points": 7.6, "colorbars_per_case": 2}
 
 
 def main():
@@ -247,17 +337,21 @@ def main():
     args = parser.parse_args()
     root = args.dataset_root.resolve()
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    folders, baseline, identities = check_runs(root, args.split, args.run_prefix, args.seed, args.expected_cases)
+    folders, baseline, identities, reports = check_runs(
+        root, args.split, args.run_prefix, args.seed, args.expected_cases)
     selection = select_cases(baseline)
     cases = [load_case(root, args.split, selected, folders) for selected in selection]
+    for case in cases:
+        attach_annotations(case, reports, "3D", 1)
     captions = {}
-    common = ("Neural networks use 3D residual prediction. Within each case, all methods share "
+    common = ("Neural networks use 3D residual prediction. "
+              "Annotations show PSNR (dB) followed by SSIM, calculated for each case. "
+              "Within each case, all methods share "
               "the reference-foreground P1–P99 intensity window and the input-error P95 upper limit. "
               "Error maps use the common foreground mask; color bars indicate original PWI intensity units.")
     stem = "qualitative_low_high"
-    draw_figure([(case, "3D", 1, case["selection"]["label"]) for case in cases],
-                "PWI denoising with 3D residual prediction",
-                args.output_dir / stem, args.dpi)
+    layout = draw_figure([(case, "3D", 1, case["selection"]["label"]) for case in cases],
+                         args.output_dir / stem, args.dpi)
     captions[stem] = ("PWI and absolute error for cases nearest the 25th and 75th percentiles of input SSIM "
                       f"({cases[0]['selection']['input_ssim']:.3f} and "
                       f"{cases[1]['selection']['input_ssim']:.3f}). " + common)
@@ -267,7 +361,7 @@ def main():
                 "selected_cases": selection,
                 "selection_rule": "Nearest input SSIM to numpy linear quantiles 0.25 and 0.75; ties by case identifier.",
                 "slice_rule": "Median cumulative foreground voxel count along canonical slice axis.",
-                "runs": identities, "generator_sha256": sha256(__file__)}
+                "runs": identities, "figure_layout": layout, "generator_sha256": sha256(__file__)}
     (args.output_dir / "qualitative_selection.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     print(f"Verified 16 DL and 2 classical evaluations with {len(baseline)} matched input baselines; "
           "wrote 1 figure and a private selection manifest for 2 cases.")
